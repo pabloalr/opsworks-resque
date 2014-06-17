@@ -9,7 +9,7 @@ Vagrant.configure("2") do |config|
   config.vm.hostname = "opsworks-resque-berkshelf"
 
   # Every Vagrant virtual environment requires a box to build off of.
-  config.vm.box = "hashicorp/precise64"
+  config.vm.box = "precise64"
 
   # Assign this VM to a host-only network IP, allowing you to access it
   # via the IP. Host-only networks can talk to the host machine as well as
@@ -63,15 +63,43 @@ Vagrant.configure("2") do |config|
   # to skip installing and copying to Vagrant's shelf.
   # config.berkshelf.except = []
 
-  config.omnibus.chef_version = :latest
+  config.omnibus.chef_version = "11.4.0"
 
-  config.vm.provision :chef_solo do |chef|
+  config.vm.provision :shell, inline: "apt-get update > /dev/null"
+
+  config.vm.provision :chef_solo, id: "chef" do |chef|
+    chef.cookbooks_path = "."
+    chef.log_level = :debug
     chef.json = {
+      deploy: {
+        :"testapp" => {
+          application: "testapp",
+          application_type: "ruby",
+          document_root: "/srv/www/testapp/current/public",
+          scm: {
+            scm_type: "git",
+            repository: "/vagrant/"
+          },
+          domains: ["testapp"],
+          memcached: {},
+          database: {},
+        },
+      },
+      resque: {
+        workers: {:"*" => 1},
+        path: "/srv/www/",
+        rails_env: "production"
+      },
+      opsworks: {
+        ruby_stack: "ruby",
+        stack: {name: "Test Stack"},
+        layers: {}
+      }
     }
 
     chef.run_list = [
         # "recipe[rails::configure]",
-        "recipe[opsworks-resque::default]"
+        "recipe[opsworks-resque::configure]"
     ]
   end
 end
